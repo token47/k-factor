@@ -13,9 +13,10 @@ BED_TEMP="60" # C degrees
 SLOW_SPEED="1200" # mm/min
 FAST_SPEED="4200" # mm/min
 MOVE_SPEED="7200" # mm/min
+USE_UBL="0" # Set to 1 to enable bed levelling
 RETRACTION="1.000" # mm
-START_X="30"
-START_Y="30"
+BEDSIZE_X="200" # mm
+BEDSIZE_Y="200" # mm
 LAYER_HEIGHT="0.200" # mm 
 EXTRUSION_FACTOR="0.037418" # calculated for 0.4mm nozzle, 0.2mm layer height and 1.75mm filament
 EXTRUSION_MULT="1.1" # arbitraty multiplier, just for testing, should be 1.0 normally
@@ -25,13 +26,25 @@ for a in 5 20 40; do
 		}")"
 done
 
+PRIME_Y1=$(awk -v var="$BEDSIZE_Y" 'BEGIN {print var - 162.5}')
+PRIME_Y2=$(awk -v var="$BEDSIZE_Y" 'BEGIN {print var - 62.5}')
+START_X=$(awk -v var="$BEDSIZE_X" 'BEGIN {print (var - 80)/2}')
+START_Y=$(awk -v var="$BEDSIZE_Y" 'BEGIN {print (var - 125)/2}')
+
+
 cat <<EOF
 ; K-FACTOR TEST
 ;
 M190 S${BED_TEMP} ; set and wait for bed temp
 M104 S${NOZZLE_TEMP} ; set nozzle temp and continue
-G28 ; home all axys
-G29 ; execute bed automatic leveling compensation
+G28 ; home all axis
+EOF
+
+if [ "$USE_UBL" = "1" ] ; then
+	echo "G29 ; execute bed automatic leveling compensation"
+fi
+
+cat <<EOF
 M109 S${NOZZLE_TEMP} ; block waiting for nozzle temp
 G21 ; set units to millimeters
 M204 S500 ; lower acceleration to 500mm/s2 during the test
@@ -39,14 +52,15 @@ M83 ; use relative distances for extrusion
 G90 ; use absolute coordinates
 ;
 ; go to layer height and prime nozzle on a line to the left
-G1 X0 Y$((START_Y+100)) F${MOVE_SPEED}
+G1 X20 Y${PRIME_Y1} F${MOVE_SPEED}
 G1 Z${LAYER_HEIGHT} F${SLOW_SPEED}
-G1 X0 Y$((START_Y+40)) E10 F${SLOW_SPEED} ; extrude some to start clean
+G1 X20 Y${PRIME_Y2} E10 F${SLOW_SPEED} ; extrude some to start clean
 G1 E-${RETRACTION}
-G1 X${START_X} Y${START_Y} F${MOVE_SPEED} ; extrude some to start clean
+
 ;
 ; start the test (all values are relative coordinates)
 ;
+G1 X${START_X} Y${START_Y} F${MOVE_SPEED} ; move to pattern start
 G91 ; use relative coordinates
 EOF
 
